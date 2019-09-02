@@ -1,0 +1,157 @@
+/**********************************
+***********************************
+
+Toon Wireframe Render 2.0
+
+//Created On : Mar 13th 2009
+//Last Updated : Sep 02nd 2011
+//Authored By - Crunk AKA Savio Fernandes
+
+//Install & Execute:
+-Copy this file to your maya default script directory
+-Source "crToonWireframeRen.mel"
+
+//Description:
+This scripts basically is an extension of my wireframe render tutorial, which uses toon shader.
+It gets quite annoying after sometime, doing same settings again and again. So this does it in a Click! :)
+
+//Usage :
+1. Select the Object Mesh.
+2. Click Assign new wireframe Shader.
+3. New Options will be available to tweak.
+4. Enjoy :)
+
+//Link To Page
+http://www.artbycrunk.com/script/maya/scripts-crtoonwireframeren/
+
+//Link To Tutorial
+http://www.artbycrunk.com/tutorial/maya/rendering-wireframe-using-toonshader/
+
+// Copyright (c) 2011 artbycrunk.com <artbycrunk@gmail.com>
+// Released under GPL v3
+
+******************************* 
+UPDATES :
+
+Sep 02 2011 - Ver 2.0 - Fixed Bug where script freaked on Maya 2011 :)
+						Added New Options to Tweak Wireframe Color and Thickness.
+						Added New error checking methods.
+						Can now Swap Wireframes on meshes.
+						Added Button to Refresh Script.
+						Added A Delete Menu for easily deleting wireframe.
+
+********************************** */
+
+global proc crToonWireframeRen()
+{
+	string $version = "2.0";
+	
+	string $wireSS[] = `ls -type "pfxToon"`;
+	
+	if (`window -q -ex TWRWin`) deleteUI TWRWin;
+	window -t ("crToonWireframeRender "+$version) -in ("crTWR "+$version) -wh 276 120 -s 1 TWRWin ;
+	
+	menuBarLayout TWRWin_menuBarLayout;
+	menu -tearOff 0 -l "Edit";
+	menuItem -l "Refresh" -ann "Refresh Script" -c "crToonWireframeRen()";
+	menu -tearOff 0 -l "Delete";
+		if(size($wireSS))
+		{
+			for( $wireS in $wireSS )
+			{
+				menuItem -l $wireS -ann ("Delete "+$wireS) -c ("TWR_Delete(\""+$wireS+"\")"); 
+			}
+		} else {
+			menuItem -l "No Wireframes!" -ann ("No Wireframes!"); 
+		}
+	
+	columnLayout -adjustableColumn true;
+	
+	for( $wireS in $wireSS )
+	{
+		if (`attributeExists "wireShader" $wireS`) {
+			frameLayout -cll 1 -borderVisible true -labelVisible true -labelAlign "center" -label $wireS -marginWidth 5 -marginHeight 5 -cc "TWR_SizeChange" -ec "TWR_SizeChange" ("Frame"+$wireS);
+				columnLayout -adjustableColumn true;
+					attrColorSliderGrp -cw 1 100 -cw 2 55 -cw 3 100 -cat 1 "right" 4 -at ($wireS+".creaseColor") -sb 0;
+					attrFieldSliderGrp -cw 1 100 -cw 2 55 -cw 3 100 -min 0 -max 10.0 -at ($wireS+".creaseLineWidth");
+					button -h 20 -l "Assign To Selected" -c ("removePfxToonOutlines; assignPfxToon "+$wireS+" 0");
+				separator;
+				setParent ..;
+			setParent ..;
+		}
+	}
+	separator;
+	separator;
+	button -h 48 -l "Assign New Wireframe" -c "TWR_AssignWire";
+	button -l "www.artbycrunk.com" -h 20 but_about;
+	
+	TWR_SizeChange();
+	
+	showWindow TWRWin;
+	
+}
+
+global proc TWR_Delete(string $shape)
+{
+	select $shape;
+	string $pfxtoon[] = `pickWalk -d up`;
+	if(size($pfxtoon)){delete $pfxtoon[0];}
+	crToonWireframeRen();
+}
+
+global proc TWR_SizeChange()
+{
+	string $wireSS[] = `ls -type "pfxToon"`;
+	if(size($wireSS))
+	{
+		int $winHeight = 115;
+		for( $wireS in $wireSS )
+		{ 
+			if (`attributeExists "wireShader" $wireS`) {
+				int $collapse = `frameLayout -q -cl ("Frame"+$wireS)`;
+				if($collapse == 1 ){$winHeight = $winHeight+22;}
+				else { $winHeight = $winHeight+100;}
+			}
+		}
+		
+		window -e -wh 276 $winHeight -s 1 TWRWin ;
+		
+	} else {
+	window -e -wh 276 120 -s 1 TWRWin ;
+	}
+}
+
+global proc TWR_AssignWire() {
+
+	string $selectedNode[], $createdNode[], $nodetype;
+
+	$selectedNode = `ls -sl`;
+	if( nodeType($selectedNode[0]) == "transform" )
+	{
+		assignNewPfxToon;
+		$createdNode= `ls -sl`;
+		if( size($createdNode) ){ $nodetype = nodeType ($createdNode[0]);}
+		
+		if($nodetype == "pfxToon")
+		{
+			string $pfxtoon[] = `pickWalk -d up`;
+			string $pfxToonShader = `rename $pfxtoon[0] "crWireframeShader"`;
+			string $pfxToonShape[] = `pickWalk -d down`;
+
+			setAttr ($pfxToonShape[0]+".profileLines") 0;
+			setAttr ($pfxToonShape[0]+".borderLines") 0;
+			setAttr ($pfxToonShape[0]+".creaseLines") 1;
+			setAttr ($pfxToonShape[0]+".hardCreasesOnly") 0;
+			setAttr ($pfxToonShape[0]+".creaseAngleMax") 0;
+			setAttr ($pfxToonShape[0]+".creaseAngleMin") 0;
+			setAttr ($pfxToonShape[0]+".creaseLineWidth") 0.5;
+			addAttr -ln "wireShader"  -at long  -dv 1 $pfxToonShape[0];
+			
+			crToonWireframeRen();
+		}
+		
+	}else{
+		error "Please Select Valid Objects";
+	}
+}
+crToonWireframeRen();
